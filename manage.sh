@@ -174,44 +174,92 @@ cron_watchdog() {
     fi
 }
 
-show_menu() {
+print_banner() {
+    cat <<'BANNER'
+ __      _  _
+(_  _ |_|_ | \ _     ._ | _  _. _| _ ._
+__)(/_| |  |_/(_)\/\/| ||(_)(_|(_|(/_|
+BANNER
+    echo "github.com/mobinjavari/self-downloader"
     echo ""
+}
+
+pause() {
+    read -rp "Press Enter to continue..." _ || true
+}
+
+clear_screen() {
+    clear 2>/dev/null || true
+}
+
+show_systemd_menu() {
+    clear_screen
+    print_banner
+    echo "===== Systemd Service (root / VPS) ====="
+    echo "1) Install/update service"
+    echo "2) Start"
+    echo "3) Stop"
+    echo "4) Restart"
+    echo "5) Status"
+    echo "6) Logs"
+    echo "7) Uninstall"
+    echo "0) Back"
+    echo "=========================================="
+    read -rp "Choose an option: " choice
+    case "$choice" in
+        1) install_service; pause ;;
+        2) start_service; pause ;;
+        3) stop_service; pause ;;
+        4) restart_service; pause ;;
+        5) show_status; pause ;;
+        6) show_logs ;;
+        7) uninstall_service; pause ;;
+        0) return 1 ;;
+        *) echo "Invalid option."; pause ;;
+    esac
+}
+
+show_cron_menu() {
+    clear_screen
+    print_banner
+    echo "===== No-root Process (cPanel / shared hosting) ====="
+    echo "1) Start"
+    echo "2) Stop"
+    echo "3) Restart"
+    echo "4) Status"
+    echo "5) Logs"
+    echo "0) Back"
+    echo "======================================================="
+    read -rp "Choose an option: " choice
+    case "$choice" in
+        1) cron_start; pause ;;
+        2) cron_stop; pause ;;
+        3) cron_restart; pause ;;
+        4) cron_status; pause ;;
+        5) cron_logs ;;
+        0) return 1 ;;
+        *) echo "Invalid option."; pause ;;
+    esac
+}
+
+show_menu() {
+    clear_screen
+    print_banner
     echo "===== Self-Downloader Manager ====="
     echo "1) Setup (venv + requirements)"
-    echo "2) Install/update systemd service (needs root)"
-    echo "3) Start service (systemd)"
-    echo "4) Stop service (systemd)"
-    echo "5) Restart service (systemd)"
-    echo "6) Show status (systemd)"
-    echo "7) Show logs (systemd)"
-    echo "8) Uninstall service (systemd)"
-    echo "9) Manage accounts"
-    echo "--- no-root / shared hosting (e.g. cPanel) ---"
-    echo "10) Start (nohup, no root needed)"
-    echo "11) Stop (nohup)"
-    echo "12) Restart (nohup)"
-    echo "13) Status (nohup)"
-    echo "14) Show logs (nohup)"
+    echo "2) Manage accounts"
+    echo "3) Systemd service (root / VPS) >"
+    echo "4) No-root process (cPanel / shared hosting) >"
     echo "0) Exit"
     echo "===================================="
     read -rp "Choose an option: " choice
     case "$choice" in
-        1) setup ;;
-        2) install_service ;;
-        3) start_service ;;
-        4) stop_service ;;
-        5) restart_service ;;
-        6) show_status ;;
-        7) show_logs ;;
-        8) uninstall_service ;;
-        9) manage_accounts ;;
-        10) cron_start ;;
-        11) cron_stop ;;
-        12) cron_restart ;;
-        13) cron_status ;;
-        14) cron_logs ;;
+        1) setup; pause ;;
+        2) manage_accounts ;;
+        3) while show_systemd_menu; do :; done ;;
+        4) while show_cron_menu; do :; done ;;
         0) exit 0 ;;
-        *) echo "Invalid option." ;;
+        *) echo "Invalid option."; pause ;;
     esac
 }
 
