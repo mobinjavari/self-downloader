@@ -81,6 +81,12 @@ def get_account(label: str) -> Account | None:
     return _row_to_account(row) if row else None
 
 
+def get_account_by_id(account_id: int) -> Account | None:
+    with get_connection() as connection:
+        row = connection.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
+    return _row_to_account(row) if row else None
+
+
 def add_account(
     label: str,
     session_string: str,

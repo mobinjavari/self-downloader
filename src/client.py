@@ -22,6 +22,23 @@ def is_timed_media(msg: Message) -> bool:
     return bool(getattr(msg.media, "ttl_seconds", None))
 
 
+def format_sender_info(sender, sender_id: int) -> str:
+    if sender is None:
+        full_name = ClientMessages.SENDER_UNKNOWN_NAME
+        username = ClientMessages.SENDER_NO_USERNAME
+    else:
+        full_name = " ".join(part for part in (sender.first_name, sender.last_name) if part)
+        full_name = full_name or ClientMessages.SENDER_UNKNOWN_NAME
+        username = f"@{sender.username}" if sender.username else ClientMessages.SENDER_NO_USERNAME
+    return ClientMessages.SENDER_INFO.format(full_name=full_name, username=username, sender_id=sender_id)
+
+
+def build_caption(sender_info: str, text: str) -> str:
+    if text:
+        return ClientMessages.CAPTION_WITH_TEXT.format(sender_info=sender_info, text=text)
+    return ClientMessages.CAPTION_WITHOUT_TEXT.format(sender_info=sender_info)
+
+
 def build_client(account: Account) -> TelegramClient:
     download_dir = settings.download_dir / account.label
     download_dir.mkdir(parents=True, exist_ok=True)
@@ -63,13 +80,16 @@ def build_client(account: Account) -> TelegramClient:
             if not file_path:
                 raise RuntimeError(ClientMessages.DOWNLOAD_NO_PATH)
 
+            sender = await msg.get_sender()
+            caption = build_caption(format_sender_info(sender, sender_id), msg.text)
+
             await client.send_file(
                 "me",
                 file_path,
-                caption=msg.text or "",
+                caption=caption,
                 progress_callback=make_progress_callback(status_msg, ClientMessages.ACTION_UPLOADING),
             )
-            await status_msg.edit(ClientMessages.SAVED.format(media_type=media_type.capitalize(), sender_id=sender_id))
+            await status_msg.delete()
 
         except Exception as e:
             logger.exception(ClientLogs.PROCESS_FAILED, account.label, sender_id)

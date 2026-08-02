@@ -13,9 +13,11 @@ console = Console()
 try:
     from src.config import settings
     from src.db import (
+        Account,
         add_account,
         delete_account,
         get_account,
+        get_account_by_id,
         init_db,
         list_accounts,
         update_account,
@@ -23,6 +25,10 @@ try:
 except RuntimeError as e:
     console.print(ConsoleMessages.CONFIG_ERROR.format(error=e))
     sys.exit(1)
+
+
+def pause() -> None:
+    console.input(ConsoleMessages.PRESS_ENTER)
 
 
 def render_accounts() -> None:
@@ -59,6 +65,21 @@ def prompt_bool(question: str, default: bool = True) -> bool:
     return answer in {"y", "yes"}
 
 
+def prompt_account_by_id(prompt: str) -> Account | None:
+    render_accounts()
+    raw = console.input(prompt).strip()
+    if not raw or raw == "0":
+        return None
+    if not raw.isdigit():
+        console.print(ConsoleMessages.INVALID_ID)
+        return None
+    account = get_account_by_id(int(raw))
+    if not account:
+        console.print(ConsoleMessages.ACCOUNT_NOT_FOUND)
+        return None
+    return account
+
+
 async def login_account() -> str:
     client = TelegramClient(StringSession(), settings.api_id, settings.api_hash)
     await client.start()
@@ -72,7 +93,6 @@ async def login_account() -> str:
 def add_account_flow() -> None:
     label = console.input(ConsoleMessages.PROMPT_LABEL).strip()
     if not label:
-        console.print(ConsoleMessages.LABEL_EMPTY)
         return
     if get_account(label):
         console.print(ConsoleMessages.LABEL_EXISTS)
@@ -98,11 +118,8 @@ def add_account_flow() -> None:
 
 
 def edit_account_flow() -> None:
-    render_accounts()
-    label = console.input(ConsoleMessages.PROMPT_EDIT_LABEL).strip()
-    account = get_account(label)
+    account = prompt_account_by_id(ConsoleMessages.PROMPT_EDIT_ID)
     if not account:
-        console.print(ConsoleMessages.ACCOUNT_NOT_FOUND)
         return
 
     is_enabled = prompt_bool(ConsoleMessages.ASK_ENABLED, account.is_enabled)
@@ -110,7 +127,7 @@ def edit_account_flow() -> None:
     save_timed_media = prompt_bool(ConsoleMessages.ASK_SAVE_TIMED_MEDIA, account.save_timed_media)
 
     update_account(
-        label,
+        account.label,
         is_enabled=is_enabled,
         save_normal_media=save_normal_media,
         save_timed_media=save_timed_media,
@@ -119,13 +136,11 @@ def edit_account_flow() -> None:
 
 
 def delete_account_flow() -> None:
-    render_accounts()
-    label = console.input(ConsoleMessages.PROMPT_DELETE_LABEL).strip()
-    if not get_account(label):
-        console.print(ConsoleMessages.ACCOUNT_NOT_FOUND)
+    account = prompt_account_by_id(ConsoleMessages.PROMPT_DELETE_ID)
+    if not account:
         return
-    if prompt_bool(ConsoleMessages.CONFIRM_DELETE.format(label=label), False):
-        delete_account(label)
+    if prompt_bool(ConsoleMessages.CONFIRM_DELETE.format(label=account.label, account_id=account.id), False):
+        delete_account(account.label)
         console.print(ConsoleMessages.ACCOUNT_DELETED)
 
 
@@ -140,6 +155,7 @@ def main() -> None:
     }
 
     while True:
+        console.clear()
         console.print(ConsoleMessages.MENU)
         choice = console.input(ConsoleMessages.CHOOSE_OPTION).strip()
         if choice == "0":
@@ -147,6 +163,7 @@ def main() -> None:
         action = actions.get(choice)
         if action is None:
             console.print(ConsoleMessages.INVALID_OPTION)
+            pause()
             continue
         try:
             action()
@@ -154,6 +171,7 @@ def main() -> None:
             raise
         except Exception as e:
             console.print(ConsoleMessages.UNEXPECTED_ERROR.format(error=e))
+        pause()
 
 
 if __name__ == "__main__":
