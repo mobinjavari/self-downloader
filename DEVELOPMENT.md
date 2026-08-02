@@ -30,20 +30,12 @@ All commands run through `manage.sh` at the project root. With no argument it op
 | `./manage.sh logs` | Follow the service logs (`journalctl -f`) |
 | `./manage.sh uninstall` | Stop, disable, and remove the systemd unit |
 
-## Adding an account
-
-Telegram login needs an interactive phone/code (and possibly 2FA) confirmation, so it can't happen unattended inside the systemd service. Run:
-
-```bash
-./manage.sh accounts
-```
-
-This logs in via Telethon, saves the resulting session string to the database, and registers the account. Only accounts with a valid stored session are picked up by `runner.py`.
+`./manage.sh accounts` logs in via Telethon, saves the resulting session string to the database, and registers the account. Only accounts with a valid stored session are picked up by `runner.py`.
 
 ## Running locally without systemd
 
 ```bash
-python3 -m venv .venv && source venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 python main.py
 ```
