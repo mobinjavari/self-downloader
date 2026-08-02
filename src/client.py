@@ -6,8 +6,10 @@ import time
 from datetime import datetime
 
 from telethon import Button, TelegramClient, events
+from telethon.extensions.markdown import add_surrogate
 from telethon.sessions import StringSession
 from telethon.tl.custom import Message
+from telethon.tl.types import MessageEntityTextUrl
 
 from src.config import settings
 from src.db import Account
@@ -22,14 +24,16 @@ def is_timed_media(msg: Message) -> bool:
     return bool(getattr(msg.media, "ttl_seconds", None))
 
 
-def format_sender_info(sender, sender_id: int) -> str:
+def format_full_name(sender) -> str:
     if sender is None:
-        full_name = ClientMessages.SENDER_UNKNOWN_NAME
-        username = ClientMessages.SENDER_NO_USERNAME
-    else:
-        full_name = " ".join(part for part in (sender.first_name, sender.last_name) if part)
-        full_name = full_name or ClientMessages.SENDER_UNKNOWN_NAME
-        username = f"@{sender.username}" if sender.username else ClientMessages.SENDER_NO_USERNAME
+        return ClientMessages.SENDER_UNKNOWN_NAME
+    full_name = " ".join(part for part in (sender.first_name, sender.last_name) if part)
+    return full_name or ClientMessages.SENDER_UNKNOWN_NAME
+
+
+def format_sender_info(sender, sender_id: int) -> str:
+    full_name = format_full_name(sender)
+    username = f"@{sender.username}" if sender and sender.username else ClientMessages.SENDER_NO_USERNAME
     return ClientMessages.SENDER_INFO.format(full_name=full_name, username=username, sender_id=sender_id)
 
 
@@ -37,6 +41,25 @@ def build_caption(sender_info: str, text: str) -> str:
     if text:
         return ClientMessages.CAPTION_WITH_TEXT.format(sender_info=sender_info, text=text)
     return ClientMessages.CAPTION_WITHOUT_TEXT.format(sender_info=sender_info)
+
+
+def build_profile_link(sender, sender_id: int) -> str:
+    username = sender.username if sender else None
+    if username:
+        return ClientMessages.PROFILE_LINK_USERNAME.format(username=username)
+    return ClientMessages.PROFILE_LINK_ID.format(sender_id=sender_id)
+
+
+def build_timed_caption(sender, sender_id: int) -> tuple[str, list[MessageEntityTextUrl]]:
+    prefix = ClientMessages.CAPTION_TIMED_PREFIX
+    full_name = format_full_name(sender)
+    text = f"{prefix}{full_name}"
+    # Offsets/lengths must be UTF-16 code units (Telegram's entity format), not Python
+    # character counts, so names containing emoji don't misplace the link.
+    offset = len(add_surrogate(prefix))
+    length = len(add_surrogate(full_name))
+    link = build_profile_link(sender, sender_id)
+    return text, [MessageEntityTextUrl(offset=offset, length=length, url=link)]
 
 
 def build_client(account: Account) -> TelegramClient:
@@ -64,6 +87,7 @@ def build_client(account: Account) -> TelegramClient:
         sender_id = msg.sender_id
         media_type = ClientMessages.MEDIA_TYPE_VIDEO if msg.video else ClientMessages.MEDIA_TYPE_PHOTO
         timestamp = datetime.now().strftime("%H:%M:%S")
+        timed = is_timed_media(msg)
 
         if status_msg is None:
             status_msg = await client.send_message(
@@ -81,14 +105,19 @@ def build_client(account: Account) -> TelegramClient:
                 raise RuntimeError(ClientMessages.DOWNLOAD_NO_PATH)
 
             sender = await msg.get_sender()
-            caption = build_caption(format_sender_info(sender, sender_id), msg.text)
+            upload_progress = make_progress_callback(status_msg, ClientMessages.ACTION_UPLOADING)
 
-            await client.send_file(
-                "me",
-                file_path,
-                caption=caption,
-                progress_callback=make_progress_callback(status_msg, ClientMessages.ACTION_UPLOADING),
-            )
+            if timed:
+                caption, entities = build_timed_caption(sender, sender_id)
+                # send_file() has no spoiler= kwarg in this Telethon version, so the
+                # upload media is built manually and the spoiler flag set on it directly.
+                _, media, _ = await client._file_to_media(file_path, progress_callback=upload_progress)
+                media.spoiler = True
+                await client.send_file("me", media, caption=caption, formatting_entities=entities)
+            else:
+                caption = build_caption(format_sender_info(sender, sender_id), msg.text)
+                await client.send_file("me", file_path, caption=caption, progress_callback=upload_progress)
+
             await status_msg.delete()
 
         except Exception as e:
