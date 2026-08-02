@@ -7,6 +7,24 @@ SERVICE_NAME="self-downloader"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 SERVICE_USER="$(whoami)"
 
+check_venv() {
+    if [ ! -f "$VENV_DIR/bin/python" ]; then
+        echo "Virtual environment not found. Run '$0 setup' first." >&2
+        exit 1
+    fi
+}
+
+check_env() {
+    if [ ! -f "$PROJECT_DIR/.env" ]; then
+        echo "Error: .env not found. Run '$0 setup' first, then edit .env with your API_ID/API_HASH." >&2
+        exit 1
+    fi
+    if grep -qE "API_ID=your_api_id|API_HASH=your_api_hash" "$PROJECT_DIR/.env"; then
+        echo "Error: .env still has placeholder API_ID/API_HASH. Edit $PROJECT_DIR/.env with your real credentials from my.telegram.org." >&2
+        exit 1
+    fi
+}
+
 setup() {
     if [ ! -d "$VENV_DIR" ]; then
         echo "Creating virtual environment..."
@@ -23,10 +41,7 @@ setup() {
 }
 
 install_service() {
-    if [ ! -f "$VENV_DIR/bin/python" ]; then
-        echo "Virtual environment not found. Run '$0 setup' first."
-        exit 1
-    fi
+    check_venv
 
     echo "Writing systemd unit to $SERVICE_FILE (requires sudo)..."
     sudo tee "$SERVICE_FILE" > /dev/null <<EOF
@@ -61,6 +76,8 @@ ensure_service_installed() {
 }
 
 start_service() {
+    check_venv
+    check_env
     ensure_service_installed
     sudo systemctl start "$SERVICE_NAME"
     show_status
@@ -72,6 +89,8 @@ stop_service() {
 }
 
 restart_service() {
+    check_venv
+    check_env
     ensure_service_installed
     sudo systemctl restart "$SERVICE_NAME"
     show_status
@@ -94,6 +113,8 @@ uninstall_service() {
 }
 
 manage_accounts() {
+    check_venv
+    check_env
     "$VENV_DIR/bin/python" "$PROJECT_DIR/console.py"
 }
 

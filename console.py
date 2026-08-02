@@ -1,52 +1,59 @@
 import asyncio
+import sys
 
 from rich.console import Console
 from rich.table import Table
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
-from src.config import settings
-from src.db import (
-    add_account,
-    delete_account,
-    get_account,
-    init_db,
-    list_accounts,
-    update_account,
-)
+from src.messages import ConsoleMessages
 
 console = Console()
+
+try:
+    from src.config import settings
+    from src.db import (
+        add_account,
+        delete_account,
+        get_account,
+        init_db,
+        list_accounts,
+        update_account,
+    )
+except RuntimeError as e:
+    console.print(ConsoleMessages.CONFIG_ERROR.format(error=e))
+    sys.exit(1)
 
 
 def render_accounts() -> None:
     accounts = list_accounts()
-    table = Table(title="Self-Downloader Accounts", show_lines=True)
-    table.add_column("ID", justify="right")
-    table.add_column("Label")
-    table.add_column("Enabled", justify="center")
-    table.add_column("Normal media", justify="center")
-    table.add_column("Timed media", justify="center")
-    table.add_column("Updated at")
+    table = Table(title=ConsoleMessages.TABLE_TITLE, show_lines=True)
+    table.add_column(ConsoleMessages.COLUMN_ID, justify="right")
+    table.add_column(ConsoleMessages.COLUMN_LABEL)
+    table.add_column(ConsoleMessages.COLUMN_ENABLED, justify="center")
+    table.add_column(ConsoleMessages.COLUMN_NORMAL_MEDIA, justify="center")
+    table.add_column(ConsoleMessages.COLUMN_TIMED_MEDIA, justify="center")
+    table.add_column(ConsoleMessages.COLUMN_UPDATED_AT)
 
     if not accounts:
-        console.print("[yellow]No accounts yet.[/yellow]")
+        console.print(ConsoleMessages.NO_ACCOUNTS)
         return
 
     for account in accounts:
         table.add_row(
             str(account.id),
             account.label,
-            "Yes" if account.is_enabled else "No",
-            "Yes" if account.save_normal_media else "No",
-            "Yes" if account.save_timed_media else "No",
+            ConsoleMessages.YES if account.is_enabled else ConsoleMessages.NO,
+            ConsoleMessages.YES if account.save_normal_media else ConsoleMessages.NO,
+            ConsoleMessages.YES if account.save_timed_media else ConsoleMessages.NO,
             account.updated_at,
         )
     console.print(table)
 
 
 def prompt_bool(question: str, default: bool = True) -> bool:
-    suffix = "Y/n" if default else "y/N"
-    answer = console.input(f"{question} [{suffix}]: ").strip().lower()
+    suffix = ConsoleMessages.SUFFIX_DEFAULT_YES if default else ConsoleMessages.SUFFIX_DEFAULT_NO
+    answer = console.input(ConsoleMessages.PROMPT_BOOL.format(question=question, suffix=suffix)).strip().lower()
     if not answer:
         return default
     return answer in {"y", "yes"}
@@ -56,26 +63,30 @@ async def login_account() -> str:
     client = TelegramClient(StringSession(), settings.api_id, settings.api_hash)
     await client.start()
     me = await client.get_me()
-    console.print(f"[green]Logged in as {me.first_name} ({me.id})[/green]")
+    console.print(ConsoleMessages.LOGIN_SUCCESS.format(name=me.first_name, user_id=me.id))
     session_string = client.session.save()
     await client.disconnect()
     return session_string
 
 
 def add_account_flow() -> None:
-    label = console.input("Account label (unique, e.g. main): ").strip()
+    label = console.input(ConsoleMessages.PROMPT_LABEL).strip()
     if not label:
-        console.print("[red]Label cannot be empty.[/red]")
+        console.print(ConsoleMessages.LABEL_EMPTY)
         return
     if get_account(label):
-        console.print("[red]An account with this label already exists.[/red]")
+        console.print(ConsoleMessages.LABEL_EXISTS)
         return
 
-    save_normal_media = prompt_bool("Save normal media?", True)
-    save_timed_media = prompt_bool("Save timed (self-destructing) media?", True)
+    save_normal_media = prompt_bool(ConsoleMessages.ASK_SAVE_NORMAL_MEDIA, True)
+    save_timed_media = prompt_bool(ConsoleMessages.ASK_SAVE_TIMED_MEDIA, True)
 
-    console.print("Starting Telegram login...")
-    session_string = asyncio.run(login_account())
+    console.print(ConsoleMessages.STARTING_LOGIN)
+    try:
+        session_string = asyncio.run(login_account())
+    except Exception as e:
+        console.print(ConsoleMessages.LOGIN_FAILED.format(error=e))
+        return
 
     add_account(
         label,
@@ -83,20 +94,20 @@ def add_account_flow() -> None:
         save_normal_media=save_normal_media,
         save_timed_media=save_timed_media,
     )
-    console.print("[green]Account added.[/green]")
+    console.print(ConsoleMessages.ACCOUNT_ADDED)
 
 
 def edit_account_flow() -> None:
     render_accounts()
-    label = console.input("Label of the account to edit: ").strip()
+    label = console.input(ConsoleMessages.PROMPT_EDIT_LABEL).strip()
     account = get_account(label)
     if not account:
-        console.print("[red]Account not found.[/red]")
+        console.print(ConsoleMessages.ACCOUNT_NOT_FOUND)
         return
 
-    is_enabled = prompt_bool("Enabled?", account.is_enabled)
-    save_normal_media = prompt_bool("Save normal media?", account.save_normal_media)
-    save_timed_media = prompt_bool("Save timed media?", account.save_timed_media)
+    is_enabled = prompt_bool(ConsoleMessages.ASK_ENABLED, account.is_enabled)
+    save_normal_media = prompt_bool(ConsoleMessages.ASK_SAVE_NORMAL_MEDIA, account.save_normal_media)
+    save_timed_media = prompt_bool(ConsoleMessages.ASK_SAVE_TIMED_MEDIA, account.save_timed_media)
 
     update_account(
         label,
@@ -104,28 +115,18 @@ def edit_account_flow() -> None:
         save_normal_media=save_normal_media,
         save_timed_media=save_timed_media,
     )
-    console.print("[green]Account updated.[/green]")
+    console.print(ConsoleMessages.ACCOUNT_UPDATED)
 
 
 def delete_account_flow() -> None:
     render_accounts()
-    label = console.input("Label of the account to delete: ").strip()
+    label = console.input(ConsoleMessages.PROMPT_DELETE_LABEL).strip()
     if not get_account(label):
-        console.print("[red]Account not found.[/red]")
+        console.print(ConsoleMessages.ACCOUNT_NOT_FOUND)
         return
-    if prompt_bool(f"Delete '{label}'? This cannot be undone.", False):
+    if prompt_bool(ConsoleMessages.CONFIRM_DELETE.format(label=label), False):
         delete_account(label)
-        console.print("[green]Account deleted.[/green]")
-
-
-MENU = """
-[bold cyan]Self-Downloader Account Manager[/bold cyan]
-1) List accounts
-2) Add account (and log in)
-3) Edit account
-4) Delete account
-0) Exit
-"""
+        console.print(ConsoleMessages.ACCOUNT_DELETED)
 
 
 def main() -> None:
@@ -139,15 +140,20 @@ def main() -> None:
     }
 
     while True:
-        console.print(MENU)
-        choice = console.input("Choose an option: ").strip()
+        console.print(ConsoleMessages.MENU)
+        choice = console.input(ConsoleMessages.CHOOSE_OPTION).strip()
         if choice == "0":
             break
         action = actions.get(choice)
         if action is None:
-            console.print("[red]Invalid option.[/red]")
+            console.print(ConsoleMessages.INVALID_OPTION)
             continue
-        action()
+        try:
+            action()
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            console.print(ConsoleMessages.UNEXPECTED_ERROR.format(error=e))
 
 
 if __name__ == "__main__":

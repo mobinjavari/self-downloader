@@ -4,9 +4,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from src.messages import ConfigErrors
+
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+PLACEHOLDER_VALUES = {"your_api_id", "your_api_hash"}
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -29,11 +33,20 @@ class Settings:
 def load_settings() -> Settings:
     api_id = os.getenv("API_ID")
     api_hash = os.getenv("API_HASH")
+
     if not api_id or not api_hash:
-        raise RuntimeError("API_ID and API_HASH must be set in the .env file")
+        raise RuntimeError(ConfigErrors.MISSING_CREDENTIALS)
+
+    if api_id in PLACEHOLDER_VALUES or api_hash in PLACEHOLDER_VALUES:
+        raise RuntimeError(ConfigErrors.PLACEHOLDER_CREDENTIALS)
+
+    try:
+        api_id_int = int(api_id)
+    except ValueError:
+        raise RuntimeError(ConfigErrors.INVALID_API_ID.format(value=api_id)) from None
 
     return Settings(
-        api_id=int(api_id),
+        api_id=api_id_int,
         api_hash=api_hash,
         delete_media_after_upload=_env_bool("DELETE_MEDIA_AFTER_UPLOAD", True),
         db_path=BASE_DIR / os.getenv("DB_PATH", "selfdownloader.db"),
