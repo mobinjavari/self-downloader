@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/username/self-downloader/
+    - $DEPLOYPATH/manage.sh setup
+    - $DEPLOYPATH/manage.sh cron-restart

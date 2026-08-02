@@ -6,6 +6,9 @@ VENV_DIR="$PROJECT_DIR/venv"
 SERVICE_NAME="self-downloader"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 SERVICE_USER="$(whoami)"
+PID_FILE="$PROJECT_DIR/main.pid"
+LOG_DIR="$PROJECT_DIR/logs"
+LOG_FILE="$LOG_DIR/self-downloader.log"
 
 check_venv() {
     if [ ! -f "$VENV_DIR/bin/python" ]; then
@@ -118,18 +121,77 @@ manage_accounts() {
     "$VENV_DIR/bin/python" "$PROJECT_DIR/console.py"
 }
 
+is_cron_process_running() {
+    [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
+}
+
+cron_start() {
+    check_venv
+    check_env
+    mkdir -p "$LOG_DIR"
+    if is_cron_process_running; then
+        echo "Already running (pid $(cat "$PID_FILE"))."
+        return
+    fi
+    nohup "$VENV_DIR/bin/python" "$PROJECT_DIR/main.py" >> "$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+    disown
+    echo "Started (pid $(cat "$PID_FILE")). Logs: $LOG_FILE"
+}
+
+cron_stop() {
+    if is_cron_process_running; then
+        kill "$(cat "$PID_FILE")"
+        echo "Stopped."
+    else
+        echo "Not running."
+    fi
+    rm -f "$PID_FILE"
+}
+
+cron_restart() {
+    cron_stop
+    cron_start
+}
+
+cron_status() {
+    if is_cron_process_running; then
+        echo "Running (pid $(cat "$PID_FILE"))."
+    else
+        echo "Not running."
+    fi
+}
+
+cron_logs() {
+    tail -n 100 -f "$LOG_FILE"
+}
+
+cron_watchdog() {
+    check_venv
+    check_env
+    if ! is_cron_process_running; then
+        cron_start
+    fi
+}
+
 show_menu() {
     echo ""
     echo "===== Self-Downloader Manager ====="
     echo "1) Setup (venv + requirements)"
-    echo "2) Install/update systemd service"
-    echo "3) Start service"
-    echo "4) Stop service"
-    echo "5) Restart service"
-    echo "6) Show status"
-    echo "7) Show logs"
-    echo "8) Uninstall service"
+    echo "2) Install/update systemd service (needs root)"
+    echo "3) Start service (systemd)"
+    echo "4) Stop service (systemd)"
+    echo "5) Restart service (systemd)"
+    echo "6) Show status (systemd)"
+    echo "7) Show logs (systemd)"
+    echo "8) Uninstall service (systemd)"
     echo "9) Manage accounts"
+    echo "--- no-root / shared hosting (e.g. cPanel) ---"
+    echo "10) Start (nohup, no root needed)"
+    echo "11) Stop (nohup)"
+    echo "12) Restart (nohup)"
+    echo "13) Status (nohup)"
+    echo "14) Show logs (nohup)"
     echo "0) Exit"
     echo "===================================="
     read -rp "Choose an option: " choice
@@ -143,6 +205,11 @@ show_menu() {
         7) show_logs ;;
         8) uninstall_service ;;
         9) manage_accounts ;;
+        10) cron_start ;;
+        11) cron_stop ;;
+        12) cron_restart ;;
+        13) cron_status ;;
+        14) cron_logs ;;
         0) exit 0 ;;
         *) echo "Invalid option." ;;
     esac
@@ -158,13 +225,19 @@ case "${1:-}" in
     logs) show_logs ;;
     uninstall) uninstall_service ;;
     accounts) manage_accounts ;;
+    cron-start) cron_start ;;
+    cron-restart) cron_restart ;;
+    cron-stop) cron_stop ;;
+    cron-status) cron_status ;;
+    cron-logs) cron_logs ;;
+    cron-watchdog) cron_watchdog ;;
     "")
         while true; do
             show_menu
         done
         ;;
     *)
-        echo "Usage: $0 {setup|install|start|stop|restart|status|logs|uninstall|accounts}"
+        echo "Usage: $0 {setup|install|start|stop|restart|status|logs|uninstall|accounts|cron-start|cron-restart|cron-stop|cron-status|cron-logs|cron-watchdog}"
         exit 1
         ;;
 esac

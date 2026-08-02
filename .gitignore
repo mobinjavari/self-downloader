@@ -4,4 +4,6 @@ __pycache__/
 
 .env
 downloads/
+logs/
 *.db
+*.pid
