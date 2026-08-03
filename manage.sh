@@ -10,43 +10,95 @@ PID_FILE="$PROJECT_DIR/main.pid"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/self-downloader.log"
 
+if [ -t 1 ]; then
+    C_RESET=$'\033[0m'
+    C_BOLD=$'\033[1m'
+    C_DIM=$'\033[2m'
+    C_RED=$'\033[31m'
+    C_GREEN=$'\033[32m'
+    C_YELLOW=$'\033[33m'
+    C_CYAN=$'\033[36m'
+else
+    C_RESET='' C_BOLD='' C_DIM='' C_RED='' C_GREEN='' C_YELLOW='' C_CYAN=''
+fi
+
+info()    { echo "${C_CYAN}${*}${C_RESET}"; }
+success() { echo "${C_GREEN}${*}${C_RESET}"; }
+warn()    { echo "${C_YELLOW}${*}${C_RESET}"; }
+fail()    { echo "${C_RED}${*}${C_RESET}" >&2; }
+
+# Draws a bordered table with a title row and one row per "key::label" entry.
+# The key gets its own color (red for "0", green otherwise) so exit/back options stand out.
+draw_menu() {
+    local title="$1"; shift
+    local entries=("$@")
+
+    local maxlen=${#title}
+    local key label content
+    local -a contents=() colors=()
+    for entry in "${entries[@]}"; do
+        key="${entry%%::*}"
+        label="${entry#*::}"
+        content="$(printf '%s) %s' "$key" "$label")"
+        contents+=("$content")
+        if [ "$key" = "0" ]; then
+            colors+=("$C_RED")
+        else
+            colors+=("$C_GREEN")
+        fi
+        (( ${#content} > maxlen )) && maxlen=${#content}
+    done
+
+    local width=$((maxlen + 2))
+    local border
+    border="$(printf -- '-%.0s' $(seq 1 $((width + 2))))"
+
+    echo "${C_CYAN}+${border}+${C_RESET}"
+    printf "${C_CYAN}|${C_RESET} ${C_BOLD}%-*s${C_RESET} ${C_CYAN}|${C_RESET}\n" "$width" "$title"
+    echo "${C_CYAN}+${border}+${C_RESET}"
+    for i in "${!contents[@]}"; do
+        printf "${C_CYAN}|${C_RESET} %s%-*s${C_RESET} ${C_CYAN}|${C_RESET}\n" "${colors[$i]}" "$width" "${contents[$i]}"
+    done
+    echo "${C_CYAN}+${border}+${C_RESET}"
+}
+
 check_venv() {
     if [ ! -f "$VENV_DIR/bin/python" ]; then
-        echo "Virtual environment not found. Run '$0 setup' first." >&2
+        fail "Virtual environment not found. Run '$0 setup' first."
         exit 1
     fi
 }
 
 check_env() {
     if [ ! -f "$PROJECT_DIR/.env" ]; then
-        echo "Error: .env not found. Run '$0 setup' first, then edit .env with your API_ID/API_HASH." >&2
+        fail "Error: .env not found. Run '$0 setup' first, then edit .env with your API_ID/API_HASH."
         exit 1
     fi
     if grep -qE "API_ID=your_api_id|API_HASH=your_api_hash" "$PROJECT_DIR/.env"; then
-        echo "Error: .env still has placeholder API_ID/API_HASH. Edit $PROJECT_DIR/.env with your real credentials from my.telegram.org." >&2
+        fail "Error: .env still has placeholder API_ID/API_HASH. Edit $PROJECT_DIR/.env with your real credentials from my.telegram.org."
         exit 1
     fi
 }
 
 setup() {
     if [ ! -d "$VENV_DIR" ]; then
-        echo "Creating virtual environment..."
+        info "Creating virtual environment..."
         python3 -m venv "$VENV_DIR"
     fi
-    echo "Installing requirements..."
+    info "Installing requirements..."
     "$VENV_DIR/bin/pip" install --upgrade pip
     "$VENV_DIR/bin/pip" install -r "$PROJECT_DIR/requirements.txt"
     if [ ! -f "$PROJECT_DIR/.env" ]; then
         cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
-        echo "Created .env from .env.example — edit it with your API_ID/API_HASH before starting."
+        warn "Created .env from .env.example — edit it with your API_ID/API_HASH before starting."
     fi
-    echo "Setup complete."
+    success "Setup complete."
 }
 
 install_service() {
     check_venv
 
-    echo "Writing systemd unit to $SERVICE_FILE (requires sudo)..."
+    info "Writing systemd unit to $SERVICE_FILE (requires sudo)..."
     sudo tee "$SERVICE_FILE" > /dev/null <<EOF
 [Unit]
 Description=Self Downloader - Telegram self-account media saver
@@ -68,12 +120,12 @@ EOF
 
     sudo systemctl daemon-reload
     sudo systemctl enable "$SERVICE_NAME"
-    echo "Service installed and enabled."
+    success "Service installed and enabled."
 }
 
 ensure_service_installed() {
     if [ ! -f "$SERVICE_FILE" ]; then
-        echo "Service not installed yet. Installing now..."
+        warn "Service not installed yet. Installing now..."
         install_service
     fi
 }
@@ -112,7 +164,7 @@ uninstall_service() {
     sudo systemctl disable "$SERVICE_NAME" 2>/dev/null || true
     sudo rm -f "$SERVICE_FILE"
     sudo systemctl daemon-reload
-    echo "Service uninstalled."
+    success "Service uninstalled."
 }
 
 manage_accounts() {
@@ -130,21 +182,21 @@ cron_start() {
     check_env
     mkdir -p "$LOG_DIR"
     if is_cron_process_running; then
-        echo "Already running (pid $(cat "$PID_FILE"))."
+        warn "Already running (pid $(cat "$PID_FILE"))."
         return
     fi
     nohup "$VENV_DIR/bin/python" "$PROJECT_DIR/main.py" >> "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
     disown
-    echo "Started (pid $(cat "$PID_FILE")). Logs: $LOG_FILE"
+    success "Started (pid $(cat "$PID_FILE")). Logs: $LOG_FILE"
 }
 
 cron_stop() {
     if is_cron_process_running; then
         kill "$(cat "$PID_FILE")"
-        echo "Stopped."
+        success "Stopped."
     else
-        echo "Not running."
+        warn "Not running."
     fi
     rm -f "$PID_FILE"
 }
@@ -156,9 +208,9 @@ cron_restart() {
 
 cron_status() {
     if is_cron_process_running; then
-        echo "Running (pid $(cat "$PID_FILE"))."
+        success "Running (pid $(cat "$PID_FILE"))."
     else
-        echo "Not running."
+        warn "Not running."
     fi
 }
 
@@ -175,12 +227,24 @@ cron_watchdog() {
 }
 
 print_banner() {
+    echo "${C_CYAN}${C_BOLD}"
     cat <<'BANNER'
- __      _  _
-(_  _ |_|_ | \ _     ._ | _  _. _| _ ._
-__)(/_| |  |_/(_)\/\/| ||(_)(_|(_|(/_|
+███████╗███████╗██╗     ███████╗
+██╔════╝██╔════╝██║     ██╔════╝
+███████╗█████╗  ██║     █████╗
+╚════██║██╔══╝  ██║     ██╔══╝
+███████║███████╗███████╗██║
+╚══════╝╚══════╝╚══════╝╚═╝
+
+██████╗  ██████╗ ██╗    ██╗███╗   ██╗██╗      ██████╗  █████╗ ██████╗ ███████╗██████╗
+██╔══██╗██╔═══██╗██║    ██║████╗  ██║██║     ██╔═══██╗██╔══██╗██╔══██╗██╔════╝██╔══██╗
+██║  ██║██║   ██║██║ █╗ ██║██╔██╗ ██║██║     ██║   ██║███████║██║  ██║█████╗  ██████╔╝
+██║  ██║██║   ██║██║███╗██║██║╚██╗██║██║     ██║   ██║██╔══██║██║  ██║██╔══╝  ██╔══██╗
+██████╔╝╚██████╔╝╚███╔███╔╝██║ ╚████║███████╗╚██████╔╝██║  ██║██████╔╝███████╗██║  ██║
+╚═════╝  ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝
 BANNER
-    echo "github.com/mobinjavari/self-downloader"
+    echo "${C_RESET}"
+    echo "${C_DIM}~> github.com/mobinjavari/self-downloader${C_RESET}"
     echo ""
 }
 
@@ -195,17 +259,16 @@ clear_screen() {
 show_systemd_menu() {
     clear_screen
     print_banner
-    echo "===== Systemd Service (root / VPS) ====="
-    echo "1) Install/update service"
-    echo "2) Start"
-    echo "3) Stop"
-    echo "4) Restart"
-    echo "5) Status"
-    echo "6) Logs"
-    echo "7) Uninstall"
-    echo "0) Back"
-    echo "=========================================="
-    read -rp "Choose an option: " choice
+    draw_menu "Systemd Service (root / VPS)" \
+        "1::Install/update service" \
+        "2::Start" \
+        "3::Stop" \
+        "4::Restart" \
+        "5::Status" \
+        "6::Logs" \
+        "7::Uninstall" \
+        "0::Back"
+    read -rp "${C_YELLOW}Choose an option: ${C_RESET}" choice
     case "$choice" in
         1) install_service; pause ;;
         2) start_service; pause ;;
@@ -215,22 +278,21 @@ show_systemd_menu() {
         6) show_logs ;;
         7) uninstall_service; pause ;;
         0) return 1 ;;
-        *) echo "Invalid option."; pause ;;
+        *) fail "Invalid option."; pause ;;
     esac
 }
 
 show_cron_menu() {
     clear_screen
     print_banner
-    echo "===== No-root Process (cPanel / shared hosting) ====="
-    echo "1) Start"
-    echo "2) Stop"
-    echo "3) Restart"
-    echo "4) Status"
-    echo "5) Logs"
-    echo "0) Back"
-    echo "======================================================="
-    read -rp "Choose an option: " choice
+    draw_menu "No-root Process (cPanel / shared hosting)" \
+        "1::Start" \
+        "2::Stop" \
+        "3::Restart" \
+        "4::Status" \
+        "5::Logs" \
+        "0::Back"
+    read -rp "${C_YELLOW}Choose an option: ${C_RESET}" choice
     case "$choice" in
         1) cron_start; pause ;;
         2) cron_stop; pause ;;
@@ -238,28 +300,27 @@ show_cron_menu() {
         4) cron_status; pause ;;
         5) cron_logs ;;
         0) return 1 ;;
-        *) echo "Invalid option."; pause ;;
+        *) fail "Invalid option."; pause ;;
     esac
 }
 
 show_menu() {
     clear_screen
     print_banner
-    echo "===== Self-Downloader Manager ====="
-    echo "1) Setup (venv + requirements)"
-    echo "2) Manage accounts"
-    echo "3) Systemd service (root / VPS) >"
-    echo "4) No-root process (cPanel / shared hosting) >"
-    echo "0) Exit"
-    echo "===================================="
-    read -rp "Choose an option: " choice
+    draw_menu "Self-Downloader Manager" \
+        "1::Setup (venv + requirements)" \
+        "2::Manage accounts" \
+        "3::Systemd service (root / VPS) >" \
+        "4::No-root process (cPanel / shared hosting) >" \
+        "0::Exit"
+    read -rp "${C_YELLOW}Choose an option: ${C_RESET}" choice
     case "$choice" in
         1) setup; pause ;;
         2) manage_accounts ;;
         3) while show_systemd_menu; do :; done ;;
         4) while show_cron_menu; do :; done ;;
         0) exit 0 ;;
-        *) echo "Invalid option."; pause ;;
+        *) fail "Invalid option."; pause ;;
     esac
 }
 
@@ -285,7 +346,7 @@ case "${1:-}" in
         done
         ;;
     *)
-        echo "Usage: $0 {setup|install|start|stop|restart|status|logs|uninstall|accounts|cron-start|cron-restart|cron-stop|cron-status|cron-logs|cron-watchdog}"
+        fail "Usage: $0 {setup|install|start|stop|restart|status|logs|uninstall|accounts|cron-start|cron-restart|cron-stop|cron-status|cron-logs|cron-watchdog}"
         exit 1
         ;;
 esac

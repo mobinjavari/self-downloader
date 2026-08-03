@@ -45,14 +45,14 @@ class RunnerLogs:
 
 
 class ConsoleMessages:
-    MENU = """
-[bold cyan]Self-Downloader Account Manager[/bold cyan]
-1) List accounts
-2) Add account (and log in)
-3) Edit account
-4) Delete account
-0) Exit
-"""
+    MENU_TITLE = "Self-Downloader Account Manager"
+    MENU_ITEMS = [
+        ("1", "List accounts"),
+        ("2", "Add account (and log in)"),
+        ("3", "Edit account"),
+        ("4", "Delete account"),
+        ("0", "Exit"),
+    ]
     TABLE_TITLE = "Self-Downloader Accounts"
     COLUMN_ID = "ID"
     COLUMN_LABEL = "Label"
@@ -83,7 +83,7 @@ class ConsoleMessages:
     ACCOUNT_UPDATED = "[green]Account updated.[/green]"
     CONFIRM_DELETE = "Delete '{label}' (id {account_id})? This cannot be undone."
     ACCOUNT_DELETED = "[green]Account deleted.[/green]"
-    CHOOSE_OPTION = "Choose an option: "
+    CHOOSE_OPTION = "[yellow]Choose an option: [/yellow]"
     INVALID_OPTION = "[red]Invalid option.[/red]"
     UNEXPECTED_ERROR = "[red]Unexpected error: {error}[/red]"
     CONFIG_ERROR = "[red]Configuration error: {error}[/red]"

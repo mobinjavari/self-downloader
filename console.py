@@ -1,6 +1,7 @@
 import asyncio
 import sys
 
+from rich import box
 from rich.console import Console
 from rich.table import Table
 from telethon import TelegramClient
@@ -31,9 +32,31 @@ def pause() -> None:
     console.input(ConsoleMessages.PRESS_ENTER)
 
 
+def render_menu() -> None:
+    table = Table(
+        title=ConsoleMessages.MENU_TITLE,
+        show_header=False,
+        box=box.ROUNDED,
+        border_style="cyan",
+        title_style="bold cyan",
+    )
+    table.add_column(justify="right")
+    table.add_column()
+    for key, label in ConsoleMessages.MENU_ITEMS:
+        style = "red" if key == "0" else "green"
+        table.add_row(f"[{style}]{key})[/{style}]", f"[{style}]{label}[/{style}]")
+    console.print(table)
+
+
 def render_accounts() -> None:
     accounts = list_accounts()
-    table = Table(title=ConsoleMessages.TABLE_TITLE, show_lines=True)
+    table = Table(
+        title=ConsoleMessages.TABLE_TITLE,
+        show_lines=True,
+        box=box.ROUNDED,
+        border_style="cyan",
+        title_style="bold cyan",
+    )
     table.add_column(ConsoleMessages.COLUMN_ID, justify="right")
     table.add_column(ConsoleMessages.COLUMN_LABEL)
     table.add_column(ConsoleMessages.COLUMN_ENABLED, justify="center")
@@ -156,7 +179,7 @@ def main() -> None:
 
     while True:
         console.clear()
-        console.print(ConsoleMessages.MENU)
+        render_menu()
         choice = console.input(ConsoleMessages.CHOOSE_OPTION).strip()
         if choice == "0":
             break
