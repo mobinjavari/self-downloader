@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterator
 
 from src.config import settings
 
@@ -21,8 +21,10 @@ class Account:
     updated_at: str
 
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS accounts (
+TABLE_NAME = "accounts"
+
+SCHEMA = f"""
+CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     label TEXT NOT NULL UNIQUE,
     session_string TEXT NOT NULL,
@@ -67,7 +69,7 @@ def _row_to_account(row: sqlite3.Row) -> Account:
 
 def list_accounts() -> list[Account]:
     with get_connection() as connection:
-        rows = connection.execute("SELECT * FROM accounts ORDER BY id").fetchall()
+        rows = connection.execute(f"SELECT * FROM {TABLE_NAME} ORDER BY id").fetchall()
     return [_row_to_account(row) for row in rows]
 
 
@@ -77,13 +79,13 @@ def list_enabled_accounts() -> list[Account]:
 
 def get_account(label: str) -> Account | None:
     with get_connection() as connection:
-        row = connection.execute("SELECT * FROM accounts WHERE label = ?", (label,)).fetchone()
+        row = connection.execute(f"SELECT * FROM {TABLE_NAME} WHERE label = ?", (label,)).fetchone()
     return _row_to_account(row) if row else None
 
 
 def get_account_by_id(account_id: int) -> Account | None:
     with get_connection() as connection:
-        row = connection.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
+        row = connection.execute(f"SELECT * FROM {TABLE_NAME} WHERE id = ?", (account_id,)).fetchone()
     return _row_to_account(row) if row else None
 
 
@@ -96,7 +98,7 @@ def add_account(
     now = datetime.now().isoformat(timespec="seconds")
     with get_connection() as connection:
         connection.execute(
-            "INSERT INTO accounts "
+            f"INSERT INTO {TABLE_NAME} "
             "(label, session_string, is_enabled, save_normal_media, save_timed_media, created_at, updated_at) "
             "VALUES (?, ?, 1, ?, ?, ?, ?)",
             (label, session_string, int(save_normal_media), int(save_timed_media), now, now),
@@ -114,11 +116,11 @@ def update_account(label: str, **fields: bool | str) -> None:
     values = [int(value) if isinstance(value, bool) else value for value in fields.values()]
     with get_connection() as connection:
         connection.execute(
-            f"UPDATE accounts SET {assignments}, updated_at = ? WHERE label = ?",
+            f"UPDATE {TABLE_NAME} SET {assignments}, updated_at = ? WHERE label = ?",
             (*values, now, label),
         )
 
 
 def delete_account(label: str) -> None:
     with get_connection() as connection:
-        connection.execute("DELETE FROM accounts WHERE label = ?", (label,))
+        connection.execute(f"DELETE FROM {TABLE_NAME} WHERE label = ?", (label,))
