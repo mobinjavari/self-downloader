@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import re
 import sys
 
 from rich import box
@@ -9,9 +11,14 @@ from rich.table import Table
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
-from src.messages import ConsoleMessages
+from src.messages import ConsoleLogs, ConsoleMessages
 
 console = Console()
+logger = logging.getLogger("self-downloader")
+
+# Account labels become filesystem directory names (see build_client in src/client.py),
+# so only characters safe in a path segment are allowed.
+LABEL_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 try:
     from src.config import settings
@@ -28,6 +35,8 @@ try:
 except RuntimeError as e:
     console.print(ConsoleMessages.CONFIG_ERROR.format(error=e))
     sys.exit(1)
+
+logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)s %(message)s")
 
 
 def pause() -> None:
@@ -119,6 +128,9 @@ def add_account_flow() -> None:
     label = console.input(ConsoleMessages.PROMPT_LABEL).strip()
     if not label:
         return
+    if not LABEL_PATTERN.match(label):
+        console.print(ConsoleMessages.INVALID_LABEL)
+        return
     if get_account(label):
         console.print(ConsoleMessages.LABEL_EXISTS)
         return
@@ -195,6 +207,7 @@ def main() -> None:
         except KeyboardInterrupt:
             raise
         except Exception as e:
+            logger.exception(ConsoleLogs.UNEXPECTED_ERROR)
             console.print(ConsoleMessages.UNEXPECTED_ERROR.format(error=e))
         pause()
 

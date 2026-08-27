@@ -3,13 +3,15 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections.abc import Awaitable
 from datetime import datetime
+from typing import Callable
 
 from telethon import Button, TelegramClient, events
 from telethon.extensions.markdown import add_surrogate
 from telethon.sessions import StringSession
 from telethon.tl.custom import Message
-from telethon.tl.types import MessageEntityTextUrl
+from telethon.tl.types import MessageEntityTextUrl, User
 
 from src.config import settings
 from src.db import Account
@@ -24,14 +26,14 @@ def is_timed_media(msg: Message) -> bool:
     return bool(getattr(msg.media, "ttl_seconds", None))
 
 
-def format_full_name(sender) -> str:
+def format_full_name(sender: User | None) -> str:
     if sender is None:
         return ClientMessages.SENDER_UNKNOWN_NAME
     full_name = " ".join(part for part in (sender.first_name, sender.last_name) if part)
     return full_name or ClientMessages.SENDER_UNKNOWN_NAME
 
 
-def format_sender_info(sender, sender_id: int) -> str:
+def format_sender_info(sender: User | None, sender_id: int) -> str:
     full_name = format_full_name(sender)
     username = f"@{sender.username}" if sender and sender.username else ClientMessages.SENDER_NO_USERNAME
     return ClientMessages.SENDER_INFO.format(full_name=full_name, username=username, sender_id=sender_id)
@@ -43,14 +45,14 @@ def build_caption(sender_info: str, text: str) -> str:
     return ClientMessages.CAPTION_WITHOUT_TEXT.format(sender_info=sender_info)
 
 
-def build_profile_link(sender, sender_id: int) -> str:
+def build_profile_link(sender: User | None, sender_id: int) -> str:
     username = sender.username if sender else None
     if username:
         return ClientMessages.PROFILE_LINK_USERNAME.format(username=username)
     return ClientMessages.PROFILE_LINK_ID.format(sender_id=sender_id)
 
 
-def build_timed_caption(sender, sender_id: int) -> tuple[str, list[MessageEntityTextUrl]]:
+def build_timed_caption(sender: User | None, sender_id: int) -> tuple[str, list[MessageEntityTextUrl]]:
     prefix = ClientMessages.CAPTION_TIMED_PREFIX
     full_name = format_full_name(sender)
     text = f"{prefix}{full_name}"
@@ -67,19 +69,20 @@ def build_client(account: Account) -> TelegramClient:
     download_dir.mkdir(parents=True, exist_ok=True)
 
     client = TelegramClient(StringSession(account.session_string), settings.api_id, settings.api_hash)
-    last_edit_time = {"value": 0.0}
+    last_edit_time = 0.0
 
-    def make_progress_callback(status_msg: Message, action: str):
+    def make_progress_callback(status_msg: Message, action: str) -> Callable[[int, int], Awaitable[None]]:
         async def progress_callback(current: int, total: int) -> None:
+            nonlocal last_edit_time
             now = time.monotonic()
-            if now - last_edit_time["value"] < EDIT_THROTTLE_SECONDS:
+            if now - last_edit_time < EDIT_THROTTLE_SECONDS:
                 return
-            last_edit_time["value"] = now
+            last_edit_time = now
             percent = current / total * 100
             try:
                 await status_msg.edit(ClientMessages.PROGRESS.format(action=action, percent=percent))
             except Exception:
-                pass
+                logger.debug(ClientLogs.PROGRESS_EDIT_FAILED, account.label)
 
         return progress_callback
 

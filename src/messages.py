@@ -33,11 +33,16 @@ class ClientLogs:
     FORWARD_FAILED = "[%s] Forward failed (%s), falling back to download/upload"
     PROCESS_FAILED = "[%s] Failed to process media from %s"
     RETRY_FAILED = "[%s] Retry failed"
+    PROGRESS_EDIT_FAILED = "[%s] Failed to edit progress message (ignored)"
+
+
+class ConsoleLogs:
+    UNEXPECTED_ERROR = "Unexpected error in console action"
 
 
 class RunnerLogs:
-    NO_ENABLED_ACCOUNTS = "No enabled accounts found. Add one with: ./manage.sh accounts"
-    NOT_AUTHORIZED = "[%s] Session not authorized. Log in first with: ./manage.sh accounts"
+    NO_ENABLED_ACCOUNTS = "No enabled accounts found. Add one with: .venv/bin/python console.py"
+    NOT_AUTHORIZED = "[%s] Session not authorized. Log in first with: .venv/bin/python console.py"
     CLIENT_START_FAILED = "[%s] Failed to start client: %s"
     CLIENT_STARTED = "[%s] Client started"
     CLIENT_CRASHED = "[%s] Client crashed: %s"
@@ -68,6 +73,7 @@ class ConsoleMessages:
     SUFFIX_DEFAULT_YES = "Y/n"
     SUFFIX_DEFAULT_NO = "y/N"
     PROMPT_LABEL = "Account label (unique, e.g. main, empty to cancel): "
+    INVALID_LABEL = "[red]Label can only contain letters, numbers, hyphens, and underscores.[/red]"
     LABEL_EXISTS = "[red]An account with this label already exists.[/red]"
     ASK_SAVE_NORMAL_MEDIA = "Save normal media?"
     ASK_SAVE_TIMED_MEDIA = "Save timed (self-destructing) media?"
