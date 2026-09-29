@@ -69,9 +69,10 @@ def build_client(account: Account) -> TelegramClient:
     download_dir.mkdir(parents=True, exist_ok=True)
 
     client = TelegramClient(StringSession(account.session_string), settings.api_id, settings.api_hash)
-    last_edit_time = 0.0
 
     def make_progress_callback(status_msg: Message, action: str) -> Callable[[int, int], Awaitable[None]]:
+        last_edit_time = 0.0
+
         async def progress_callback(current: int, total: int) -> None:
             nonlocal last_edit_time
             now = time.monotonic()
