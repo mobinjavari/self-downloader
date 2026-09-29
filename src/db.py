@@ -51,6 +51,9 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 def init_db() -> None:
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
     with get_connection() as connection:
+        # WAL lets console.py (account edits) and runner.py (the live downloader)
+        # hold the same database open at once without "database is locked" errors.
+        connection.execute("PRAGMA journal_mode=WAL")
         connection.execute(SCHEMA)
 
 

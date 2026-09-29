@@ -8,4 +8,5 @@ downloads/
 logs/
 run/
 *.db
+*.db-*
 *.pid
