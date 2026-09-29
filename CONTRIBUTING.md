@@ -16,14 +16,9 @@ Requires Python 3.9+. There's no automated test suite yet — verify changes by 
 
 ## Schema Workflow
 
-- `src/config.py` loads and validates settings from the environment.
-- `src/db.py` persists accounts in SQLite.
-- `src/messages.py` centralizes every user-facing string and log template so the logic files stay free of text literals.
-- `src/client.py` builds a Telethon client per account and implements the media-saving flow.
-- `src/runner.py` starts all enabled accounts and keeps them running concurrently, isolating failures per account.
-- `main.py` is the process entry point.
-- `console.py` is the interactive CLI for managing accounts and logging in.
-- `scripts/` deploys and supervises the process on shared hosting without root access: `deploy.sh` (full deploy, called by `.cpanel.yml`), `appctl.sh` (start/stop/restart/watchdog/status via a PID file), `install-cron.sh` (installs the watchdog and boot-start cron entries).
+- `src/` holds the core application logic: settings loading/validation, account persistence, the Telegram client and media-saving flow, the multi-account runner, and the centralized user-facing text/log templates.
+- The project root holds the two entry points: the unattended downloader process and the interactive account-management CLI.
+- `scripts/` holds the deployment and process-supervision tooling used to run the project on shared hosting without root access.
 
 ## Contribution Workflow
 
