@@ -5,10 +5,6 @@ __pycache__/
 
 .env
 storage/
-# Legacy locations from before generated files were grouped under storage/.
-downloads/
-logs/
-run/
 *.db
 *.db-*
 *.pid
