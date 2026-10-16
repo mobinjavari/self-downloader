@@ -9,6 +9,7 @@ from src.messages import ConfigErrors
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+STORAGE_DIR = BASE_DIR / "storage"
 
 PLACEHOLDER_VALUES = {"your_api_id", "your_api_hash"}
 
@@ -45,12 +46,14 @@ def load_settings() -> Settings:
     except ValueError:
         raise RuntimeError(ConfigErrors.INVALID_API_ID.format(value=api_id)) from None
 
+    db_filename = Path(os.getenv("DB_FILENAME", "selfdownloader.db")).name
+
     return Settings(
         api_id=api_id_int,
         api_hash=api_hash,
         delete_media_after_upload=_env_bool("DELETE_MEDIA_AFTER_UPLOAD", True),
-        db_path=BASE_DIR / os.getenv("DB_PATH", "selfdownloader.db"),
-        download_dir=BASE_DIR / os.getenv("DOWNLOAD_DIR", "downloads"),
+        db_path=STORAGE_DIR / db_filename,
+        download_dir=STORAGE_DIR / "downloads",
         log_level=os.getenv("LOG_LEVEL", "INFO"),
     )
 

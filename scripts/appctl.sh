@@ -8,8 +8,9 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="$PROJECT_DIR/.venv"
-RUN_DIR="$PROJECT_DIR/run"
-LOG_DIR="$PROJECT_DIR/logs"
+STORAGE_DIR="$PROJECT_DIR/storage"
+RUN_DIR="$STORAGE_DIR/run"
+LOG_DIR="$STORAGE_DIR/logs"
 LOCK_DIR="$RUN_DIR/appctl.lock.d"
 PID_FILE="$RUN_DIR/main.pid"
 LOG_FILE="$LOG_DIR/main.log"

@@ -7,9 +7,11 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MARKER="# self-downloader-appctl (managed by scripts/install-cron.sh, do not edit by hand)"
 
+mkdir -p "$PROJECT_DIR/storage/logs"
+
 NEW_LINES="$MARKER
-*/5 * * * * cd $PROJECT_DIR && bash scripts/appctl.sh watchdog >> logs/watchdog.log 2>&1
-@reboot cd $PROJECT_DIR && bash scripts/appctl.sh start >> logs/watchdog.log 2>&1"
+*/5 * * * * cd $PROJECT_DIR && bash scripts/appctl.sh watchdog >> storage/logs/watchdog.log 2>&1
+@reboot cd $PROJECT_DIR && bash scripts/appctl.sh start >> storage/logs/watchdog.log 2>&1"
 
 {
     # `|| true`: no existing crontab (first install) is normal, not an error.
